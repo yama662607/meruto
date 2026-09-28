@@ -37,15 +37,23 @@ struct AgentBrandIconView: View {
 }
 
 enum AgentQuotaStyle {
-    static func gaugeColor(remainingPct: Double) -> Color {
-        if remainingPct <= 0 { return .red }
-        if remainingPct < 15 { return .orange }
+    /// 残量の段階の色。5h 枠は残り 10/20/30%、週次枠は 7 等分で切り替わる (`QuotaLevel`)。
+    static func color(for level: QuotaLevel) -> Color {
+        switch level {
+        case .critical: .red
+        case .low: .orange
+        case .caution: Theme.yellow
         // 鮮やかすぎる蛍光グリーンから、落ち着いた上品なミントフォレストグリーンへ
-        return Theme.quotaGreen
+        case .ok: Theme.quotaGreen
+        }
     }
 
-    static func gaugeGradient(remainingPct: Double) -> LinearGradient {
-        let color = gaugeColor(remainingPct: remainingPct)
+    static func gaugeColor(for window: AgentQuotaWindow) -> Color {
+        color(for: window.level)
+    }
+
+    static func gaugeGradient(for window: AgentQuotaWindow) -> LinearGradient {
+        let color = gaugeColor(for: window)
         return LinearGradient(colors: [color.opacity(0.7), color], startPoint: .leading, endPoint: .trailing)
     }
 
@@ -72,8 +80,7 @@ struct AgentQuotaMiniGauge: View {
             // 1. リング (5hローリング枠: 線幅3.2px、中央ロゴ24px)
             ZStack {
                 let win5h = item.primaryWindow
-                let pct5h = win5h?.remainingPct ?? 100.0
-                let color5h = item.hasData ? AgentQuotaStyle.gaugeColor(remainingPct: pct5h) : Color.white
+                let color5h = win5h.map(AgentQuotaStyle.gaugeColor(for:)) ?? (item.hasData ? Theme.quotaGreen : Color.white)
 
                 // 背景トラック
                 Circle()
@@ -86,7 +93,7 @@ struct AgentQuotaMiniGauge: View {
                     Circle()
                         .trim(from: 0, to: CGFloat(max(0.001, min(1.0, win.remainingPct / 100.0))))
                         .stroke(
-                            AgentQuotaStyle.gaugeGradient(remainingPct: win.remainingPct),
+                            AgentQuotaStyle.gaugeGradient(for: win),
                             style: StrokeStyle(lineWidth: 3.2 * scale, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
@@ -137,7 +144,7 @@ struct AgentQuotaMiniGauge: View {
                                 .fill(Color.white.opacity(0.12))
                                 .frame(height: 2.5 * scale)
                             Capsule()
-                                .fill(AgentQuotaStyle.gaugeColor(remainingPct: weekly.remainingPct))
+                                .fill(AgentQuotaStyle.gaugeColor(for: weekly))
                                 .frame(
                                     width: max(2, geo.size.width * CGFloat(weekly.remainingPct / 100.0)),
                                     height: 2.5 * scale
@@ -224,14 +231,14 @@ struct AgentQuotaWeeklyBars: View {
                                     .fill(Color.white.opacity(0.08))
                                     .frame(height: 5)
                                 Capsule()
-                                    .fill(AgentQuotaStyle.gaugeGradient(remainingPct: weekly.remainingPct))
+                                    .fill(AgentQuotaStyle.gaugeGradient(for: weekly))
                                     .frame(width: max(2, geo.size.width * CGFloat(weekly.remainingPct / 100.0)), height: 5)
                             }
                         }
                         .frame(height: 5)
                         Text("残り \(Int(weekly.remainingPct))%")
                             .font(.system(size: 9, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(AgentQuotaStyle.gaugeColor(remainingPct: weekly.remainingPct))
+                            .foregroundStyle(AgentQuotaStyle.gaugeColor(for: weekly))
                             .frame(width: 50, alignment: .trailing)
                     }
                     .padding(.vertical, 1)

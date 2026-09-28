@@ -40,7 +40,7 @@ struct ProviderDetailPanel: View {
                         Spacer()
                         Text("残り \(Int(window.remainingPct))%")
                             .font(.system(size: 11, weight: .bold).monospacedDigit())
-                            .foregroundStyle(AgentQuotaStyle.gaugeColor(remainingPct: window.remainingPct))
+                            .foregroundStyle(AgentQuotaStyle.gaugeColor(for: window))
                         if let reset = AgentQuotaDisplay.resetLabel(for: window, now: now) {
                             Text("↻ \(reset)")
                                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
@@ -51,7 +51,7 @@ struct ProviderDetailPanel: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.white.opacity(0.08))
                             Capsule()
-                                .fill(AgentQuotaStyle.gaugeGradient(remainingPct: window.remainingPct))
+                                .fill(AgentQuotaStyle.gaugeGradient(for: window))
                                 .frame(width: max(3, geo.size.width * window.remainingPct / 100))
                         }
                     }

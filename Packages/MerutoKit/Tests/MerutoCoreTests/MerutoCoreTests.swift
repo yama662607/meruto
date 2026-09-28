@@ -212,6 +212,40 @@ import Testing
         #expect(ordered[2].scopeId == "home-placeholder")
     }
 
+    @Test func shortWindowLevels() {
+        #expect(QuotaLevel(remainingPct: 0, weekly: false) == .critical)
+        #expect(QuotaLevel(remainingPct: 9.9, weekly: false) == .critical)
+        #expect(QuotaLevel(remainingPct: 10, weekly: false) == .low)
+        #expect(QuotaLevel(remainingPct: 19.9, weekly: false) == .low)
+        #expect(QuotaLevel(remainingPct: 20, weekly: false) == .caution)
+        #expect(QuotaLevel(remainingPct: 29.9, weekly: false) == .caution)
+        #expect(QuotaLevel(remainingPct: 30, weekly: false) == .ok)
+        #expect(QuotaLevel(remainingPct: 100, weekly: false) == .ok)
+    }
+
+    @Test func weeklyLevelsUseSevenths() {
+        #expect(QuotaLevel(remainingPct: 14, weekly: true) == .critical)  // < 1/7
+        #expect(QuotaLevel(remainingPct: 15, weekly: true) == .low)  // 1/7..2/7
+        #expect(QuotaLevel(remainingPct: 28, weekly: true) == .low)
+        #expect(QuotaLevel(remainingPct: 29, weekly: true) == .caution)  // 2/7..3/7
+        #expect(QuotaLevel(remainingPct: 42, weekly: true) == .caution)
+        #expect(QuotaLevel(remainingPct: 43, weekly: true) == .ok)  // >= 3/7
+    }
+
+    @Test func windowKindSelectsThresholds() {
+        func window(_ kind: String, minutes: Int?, remaining: Double) -> AgentQuotaWindow {
+            AgentQuotaWindow(
+                id: kind, label: "", kind: kind, usedPct: 100 - remaining, remainingPct: remaining,
+                windowMinutes: minutes, resetsAt: nil, resetsInSeconds: nil)
+        }
+        // 残り 25%: 5h なら黄、週次ならオレンジ
+        #expect(window("rolling_short", minutes: 300, remaining: 25).level == .caution)
+        #expect(window("weekly", minutes: 10080, remaining: 25).level == .low)
+        // モデル別でも 7 日枠なら週次の段階
+        #expect(window("model_specific", minutes: 10080, remaining: 25).level == .low)
+        #expect(window("model_specific", minutes: 300, remaining: 25).level == .caution)
+    }
+
     @Test func resetLabels() {
         let now = Date(timeIntervalSince1970: 0)
         let window = AgentQuotaWindow(
