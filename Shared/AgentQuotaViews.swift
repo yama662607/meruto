@@ -93,17 +93,20 @@ struct AgentQuotaMiniGauge: View {
                     .frame(width: 44 * scale, height: 44 * scale)
                     .opacity(showsStaleState ? 0.58 : 1)
 
-                // 5hプログレス円弧
+                // 5hプログレス円弧。残量に比例して最後まで減らし、0% (制限中) では描かずに
+                // 紫の背景トラックだけを見せる。
                 if let win = win5h {
-                    Circle()
-                        .trim(from: 0, to: CGFloat(max(0.001, min(1.0, win.remainingPct / 100.0))))
-                        .stroke(
-                            AgentQuotaStyle.gaugeGradient(for: win),
-                            style: StrokeStyle(lineWidth: 3.2 * scale, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 44 * scale, height: 44 * scale)
-                        .opacity(showsStaleState ? 0.58 : 1)
+                    if win.level != .limited {
+                        Circle()
+                            .trim(from: 0, to: CGFloat(min(1.0, win.remainingPct / 100.0)))
+                            .stroke(
+                                AgentQuotaStyle.gaugeGradient(for: win),
+                                style: StrokeStyle(lineWidth: 3.2 * scale, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: 44 * scale, height: 44 * scale)
+                            .opacity(showsStaleState ? 0.58 : 1)
+                    }
                 } else if item.credits != nil {
                     Circle()
                         .trim(from: 0, to: 0.8)
