@@ -76,7 +76,8 @@ struct ProviderDetailPanel: View {
         switch item.status {
         case "ready": Theme.quotaGreen
         case "warning", "degraded": .orange
-        case "rate_limited", "unauthorized": .red
+        case "rate_limited": AgentQuotaStyle.rateLimitedColor
+        case "unauthorized": .red
         default: .gray
         }
     }

@@ -118,8 +118,9 @@ public struct AgentQuotaProviderItem: Identifiable, Sendable, Equatable {
     }
 }
 
-/// 残量の色の段階。バーやリングは分割せず、色だけをこの段階で変える。
+/// 残量の色の段階 (SuperNotch と同じ)。バーやリングは分割せず、色だけをこの段階で変える。
 public enum QuotaLevel: Int, Sendable, Comparable, CaseIterable {
+    case limited  // 紫: 実質 0% (制限中)
     case critical  // 赤
     case low  // オレンジ
     case caution  // 黄
@@ -131,10 +132,14 @@ public enum QuotaLevel: Int, Sendable, Comparable, CaseIterable {
     public static let shortWindowThresholds: [Double] = [10, 20, 30]
     /// 週次枠は 100% を 7 等分し、下から 3 区間を赤・オレンジ・黄にする (1 日分ずつ)。
     public static let weeklyThresholds: [Double] = [100.0 / 7, 200.0 / 7, 300.0 / 7]
+    /// これ未満は制限中とみなす。
+    public static let limitedThreshold = 0.5
 
     public init(remainingPct: Double, weekly: Bool) {
         let thresholds = weekly ? Self.weeklyThresholds : Self.shortWindowThresholds
-        if remainingPct < thresholds[0] {
+        if remainingPct < Self.limitedThreshold {
+            self = .limited
+        } else if remainingPct < thresholds[0] {
             self = .critical
         } else if remainingPct < thresholds[1] {
             self = .low

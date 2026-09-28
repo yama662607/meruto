@@ -19,6 +19,6 @@
   - OS の値を読むコード (mach / sysctl / getifaddrs / ICMP) は `MerutoProbes` に閉じ込める。
 - iOS が公開していない値 (GPU 使用率、温度の実測値、Wi-Fi の RSSI) を推測値で埋めない。代替の指標を出すときは画面で「何を測っているか」を明記する。
 - UI 文言は日本語。色は `Theme` のトークンだけを使う。
-- AI 使用量カードは姉妹アプリ SuperNotch の AgentQuota モジュールの見た目を移植したもの。寸法は SuperNotch 側と揃える。残量の色だけは Meruto 独自の段階 (`MerutoCore` の `QuotaLevel`: 5h 枠は残り 10/20/30%、週次は 7 等分で赤・オレンジ・黄・緑) を使う。
+- AI 使用量カードは姉妹アプリ SuperNotch の AgentQuota モジュールの見た目を移植したもの。寸法・色は SuperNotch 側 (`AgentQuotaView.gaugeColor`) と揃える。残量の色の段階は `MerutoCore` の `QuotaLevel` (0.5% 未満は制限中の紫、5h 枠は残り 10/20/30%、週次は 7 等分で赤・オレンジ・黄・緑)。SuperNotch 側が変わったら追従する。
 - データ源は Mac で動く agent-quota (`GET /api/v1/quota`)。API を変えるときは agent-quota の `docs/API.md` を確認する。
 - 個人の値 (署名チーム ID、agent-quota の URL、tailnet 名) はコミットしない。`Config/Local.xcconfig` (gitignore 済み) に書き、ビルド設定経由で使う。公開リポジトリなので、コミット前に `git grep` で ts.net・チーム ID・メールアドレスが混ざっていないか確認する。

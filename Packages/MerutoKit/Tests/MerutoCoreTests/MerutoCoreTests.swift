@@ -213,7 +213,9 @@ import Testing
     }
 
     @Test func shortWindowLevels() {
-        #expect(QuotaLevel(remainingPct: 0, weekly: false) == .critical)
+        #expect(QuotaLevel(remainingPct: 0, weekly: false) == .limited)
+        #expect(QuotaLevel(remainingPct: 0.4, weekly: true) == .limited)
+        #expect(QuotaLevel(remainingPct: 0.5, weekly: false) == .critical)
         #expect(QuotaLevel(remainingPct: 9.9, weekly: false) == .critical)
         #expect(QuotaLevel(remainingPct: 10, weekly: false) == .low)
         #expect(QuotaLevel(remainingPct: 19.9, weekly: false) == .low)

@@ -37,12 +37,17 @@ struct AgentBrandIconView: View {
 }
 
 enum AgentQuotaStyle {
+    /// 0% で制限中のときだけ使う、減色レンジ（赤→緑）と別の専用カラー (SuperNotch と同じ)。
+    static let rateLimitedColor = Color(red: 0.66, green: 0.28, blue: 0.95)
+
     /// 残量の段階の色。5h 枠は残り 10/20/30%、週次枠は 7 等分で切り替わる (`QuotaLevel`)。
+    /// RGB は SuperNotch の AgentQuotaView と揃えている。
     static func color(for level: QuotaLevel) -> Color {
         switch level {
-        case .critical: .red
-        case .low: .orange
-        case .caution: Theme.yellow
+        case .limited: rateLimitedColor
+        case .critical: Color(red: 0.90, green: 0.22, blue: 0.22)
+        case .low: Color(red: 0.95, green: 0.60, blue: 0.15)
+        case .caution: Color(red: 0.95, green: 0.78, blue: 0.20)
         // 鮮やかすぎる蛍光グリーンから、落ち着いた上品なミントフォレストグリーンへ
         case .ok: Theme.quotaGreen
         }
@@ -80,7 +85,7 @@ struct AgentQuotaMiniGauge: View {
             // 1. リング (5hローリング枠: 線幅3.2px、中央ロゴ24px)
             ZStack {
                 let win5h = item.primaryWindow
-                let color5h = win5h.map(AgentQuotaStyle.gaugeColor(for:)) ?? (item.hasData ? Theme.quotaGreen : Color.white)
+                let color5h = win5h.map(AgentQuotaStyle.gaugeColor(for:)) ?? Color.white
 
                 // 背景トラック
                 Circle()
@@ -124,7 +129,7 @@ struct AgentQuotaMiniGauge: View {
             } else if item.status == "rate_limited" {
                 Text("制限中")
                     .font(.system(size: 10.5 * scale, weight: .bold))
-                    .foregroundStyle(Color.red)
+                    .foregroundStyle(AgentQuotaStyle.rateLimitedColor)
             } else if let creds = item.credits {
                 Text("$\(String(format: "%.1f", creds))")
                     .font(.system(size: 11 * scale, weight: .bold).monospacedDigit())
