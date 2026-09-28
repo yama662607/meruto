@@ -49,10 +49,12 @@ struct ProviderDetailPanel: View {
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Color.white.opacity(0.08))
-                            Capsule()
-                                .fill(AgentQuotaStyle.gaugeGradient(for: window))
-                                .frame(width: max(3, geo.size.width * window.remainingPct / 100))
+                            Capsule().fill(AgentQuotaStyle.barTrackColor(for: window, normalOpacity: 0.08))
+                            if window.level != .limited {
+                                Capsule()
+                                    .fill(AgentQuotaStyle.gaugeGradient(for: window))
+                                    .frame(width: geo.size.width * min(1, window.remainingPct / 100))
+                            }
                         }
                     }
                     .frame(height: 5)

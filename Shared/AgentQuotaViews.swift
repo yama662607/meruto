@@ -57,6 +57,11 @@ enum AgentQuotaStyle {
         color(for: window.level)
     }
 
+    /// バーの下地。0% (制限中) のときだけ紫にする (リングの背景トラックと同じ扱い。細いので少し濃くする)。
+    static func barTrackColor(for window: AgentQuotaWindow, normalOpacity: Double) -> Color {
+        window.level == .limited ? rateLimitedColor.opacity(0.3) : Color.white.opacity(normalOpacity)
+    }
+
     static func gaugeGradient(for window: AgentQuotaWindow) -> LinearGradient {
         let color = gaugeColor(for: window)
         return LinearGradient(colors: [color.opacity(0.7), color], startPoint: .leading, endPoint: .trailing)
@@ -149,15 +154,18 @@ struct AgentQuotaMiniGauge: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color.white.opacity(0.12))
+                                .fill(AgentQuotaStyle.barTrackColor(for: weekly, normalOpacity: 0.12))
                                 .frame(height: 2.5 * scale)
-                            Capsule()
-                                .fill(AgentQuotaStyle.gaugeColor(for: weekly))
-                                .frame(
-                                    width: max(2, geo.size.width * CGFloat(weekly.remainingPct / 100.0)),
-                                    height: 2.5 * scale
-                                )
-                                .opacity(showsStaleState ? 0.58 : 1)
+                            // 残量に比例して最後まで減らし、0% (制限中) では描かない。
+                            if weekly.level != .limited {
+                                Capsule()
+                                    .fill(AgentQuotaStyle.gaugeColor(for: weekly))
+                                    .frame(
+                                        width: geo.size.width * CGFloat(min(1, weekly.remainingPct / 100.0)),
+                                        height: 2.5 * scale
+                                    )
+                                    .opacity(showsStaleState ? 0.58 : 1)
+                            }
                         }
                     }
                     .frame(width: 36 * scale, height: 2.5 * scale)
@@ -236,11 +244,13 @@ struct AgentQuotaWeeklyBars: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule()
-                                    .fill(Color.white.opacity(0.08))
+                                    .fill(AgentQuotaStyle.barTrackColor(for: weekly, normalOpacity: 0.08))
                                     .frame(height: 5)
-                                Capsule()
-                                    .fill(AgentQuotaStyle.gaugeGradient(for: weekly))
-                                    .frame(width: max(2, geo.size.width * CGFloat(weekly.remainingPct / 100.0)), height: 5)
+                                if weekly.level != .limited {
+                                    Capsule()
+                                        .fill(AgentQuotaStyle.gaugeGradient(for: weekly))
+                                        .frame(width: geo.size.width * CGFloat(min(1, weekly.remainingPct / 100.0)), height: 5)
+                                }
                             }
                         }
                         .frame(height: 5)
