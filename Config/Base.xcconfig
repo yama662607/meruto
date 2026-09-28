@@ -1,0 +1,6 @@
+// 全ターゲット共通の設定。個人の値 (署名チーム・agent-quota の URL) は
+// リポジトリに入れない Config/Local.xcconfig に書く (Local.example.xcconfig をコピー)。
+DEVELOPMENT_TEAM =
+AGENT_QUOTA_BASE_URL =
+
+#include? "Local.xcconfig"

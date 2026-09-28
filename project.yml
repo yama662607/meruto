@@ -1,0 +1,87 @@
+name: Meruto
+
+options:
+  minimumXcodeGenVersion: 2.46.0
+  bundleIdPrefix: com.yama662607
+  deploymentTarget:
+    iOS: "17.0"
+
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "3"
+    DEVELOPMENT_LANGUAGE: ja
+
+packages:
+  MerutoKit:
+    path: Packages/MerutoKit
+
+targets:
+  Meruto:
+    type: application
+    platform: iOS
+    sources:
+      - path: Meruto
+        excludes:
+          - "**/*.md"
+          - "Resources/Info.plist"
+      - path: Shared
+    dependencies:
+      - package: MerutoKit
+        product: MerutoCore
+      - package: MerutoKit
+        product: MerutoProbes
+      - target: MerutoWidgets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yama662607.meruto
+        PRODUCT_NAME: Meruto
+        INFOPLIST_FILE: Meruto/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Meruto/Resources/Meruto.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+  MerutoWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MerutoWidgets
+        excludes:
+          - "Info.plist"
+      - path: Shared
+    dependencies:
+      - package: MerutoKit
+        product: MerutoCore
+      - package: MerutoKit
+        product: MerutoProbes
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yama662607.meruto.widgets
+        PRODUCT_NAME: MerutoWidgets
+        INFOPLIST_FILE: MerutoWidgets/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: MerutoWidgets/MerutoWidgets.entitlements
+        SKIP_INSTALL: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+schemes:
+  Meruto:
+    build:
+      targets:
+        Meruto: all
+        MerutoWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release

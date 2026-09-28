@@ -1,0 +1,8 @@
+// cp Config/Local.example.xcconfig Config/Local.xcconfig して値を埋める (Local.xcconfig は .gitignore 済み)。
+
+// Apple Developer のチーム ID (実機ビルド・TestFlight 用)。
+DEVELOPMENT_TEAM = XXXXXXXXXX
+
+// Mac で動く agent-quota を tailscale serve で公開した URL。
+// xcconfig では "//" がコメントになるので "https:/$()/" と書く。
+AGENT_QUOTA_BASE_URL = https:/$()/your-mac.your-tailnet.ts.net:10000
