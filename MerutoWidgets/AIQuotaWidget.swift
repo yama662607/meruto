@@ -113,13 +113,14 @@ struct AIQuotaWidgetView: View {
         VStack(spacing: 4) {
             header
             Spacer(minLength: 0)
-            let items = Array(entry.displayed.prefix(6))
-            Grid(horizontalSpacing: 4, verticalSpacing: 6) {
+            // 4x2 でホーム 7 スロット (Claude Personal / Team を含む) を収める。
+            let items = Array(entry.displayed.prefix(7))
+            Grid(horizontalSpacing: 3, verticalSpacing: 6) {
                 GridRow {
-                    ForEach(items.prefix(3)) { AgentQuotaMiniGauge(item: $0, now: entry.date, scale: 0.74, showsWeekly: false) }
+                    ForEach(items.prefix(4)) { AgentQuotaMiniGauge(item: $0, now: entry.date, scale: 0.6, showsWeekly: false) }
                 }
                 GridRow {
-                    ForEach(items.dropFirst(3)) { AgentQuotaMiniGauge(item: $0, now: entry.date, scale: 0.74, showsWeekly: false) }
+                    ForEach(items.dropFirst(4)) { AgentQuotaMiniGauge(item: $0, now: entry.date, scale: 0.6, showsWeekly: false) }
                 }
             }
             Spacer(minLength: 0)
