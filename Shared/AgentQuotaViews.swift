@@ -207,7 +207,7 @@ struct AgentQuotaMiniGauge: View {
     }
 }
 
-/// 固定 6 プロバイダーのゲージ列。
+/// ホーム固定プロバイダーのゲージ列 (Claude は Personal / Team を別スロットにする)。
 struct AgentQuotaGaugeRow: View {
     let providers: [AgentQuotaProviderItem]
     let now: Date
@@ -215,7 +215,7 @@ struct AgentQuotaGaugeRow: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            ForEach(providers.prefix(AgentQuotaProviderItem.homeProviderIDs.count)) { item in
+            ForEach(providers.filter { AgentQuotaProviderItem.homeProviderIDs.contains($0.provider) }) { item in
                 AgentQuotaMiniGauge(item: item, now: now, scale: scale)
                     .frame(maxWidth: .infinity)
             }

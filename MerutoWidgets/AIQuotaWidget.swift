@@ -99,7 +99,7 @@ struct AIQuotaWidgetView: View {
         }
     }
 
-    // SuperNotch と同じ 6 連ゲージ。
+    // SuperNotch と同じホーム固定プロバイダーのゲージ列 (Claude は Personal / Team を別スロットにする)。
     private var medium: some View {
         VStack(spacing: 6) {
             header
@@ -130,7 +130,7 @@ struct AIQuotaWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             AgentQuotaGaugeRow(providers: entry.displayed, now: entry.date)
-            let others = Array(entry.displayed.dropFirst(AgentQuotaProviderItem.homeProviderIDs.count))
+            let others = entry.displayed.filter { !AgentQuotaProviderItem.homeProviderIDs.contains($0.provider) }
             if !others.isEmpty {
                 HStack(spacing: 0) {
                     ForEach(others.prefix(6)) { item in

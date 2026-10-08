@@ -212,6 +212,28 @@ import Testing
         #expect(ordered[2].scopeId == "home-placeholder")
     }
 
+    @Test func displayOrderKeepsOneSlotPerScope() {
+        func item(provider: String, scope: String, label: String) -> AgentQuotaProviderItem {
+            AgentQuotaProviderItem(
+                provider: provider, scopeId: scope, scopeLabel: label, status: "ready", planName: nil,
+                emailMasked: nil, windows: [], credits: nil, currency: nil, isStale: false,
+                dataTimestamp: nil, lastErrorMessage: nil)
+        }
+        let ordered = AgentQuotaProviderItem.displayOrder([
+            item(provider: "claude_code", scope: "personal", label: "Claude Personal"),
+            item(provider: "grok", scope: "g", label: "Grok"),
+            item(provider: "claude_code", scope: "default", label: "Claude Team"),
+            item(provider: "codex", scope: "x", label: "ChatGPT"),
+        ])
+        // Claude は Personal / Team が別スロット (ホームは 7 枠)、grok はホーム外の後ろへ。
+        #expect(ordered.prefix(7).map { $0.provider + ":" + $0.scopeId } == [
+            "codex:x", "claude_code:personal", "claude_code:default",
+            "antigravity:home-placeholder", "zai:home-placeholder", "deepseek:home-placeholder", "devin:home-placeholder",
+        ])
+        #expect(ordered.count == 8)
+        #expect(ordered.last?.provider == "grok")
+    }
+
     @Test func shortWindowLevels() {
         #expect(QuotaLevel(remainingPct: 0, weekly: false) == .limited)
         #expect(QuotaLevel(remainingPct: 0.4, weekly: true) == .limited)
