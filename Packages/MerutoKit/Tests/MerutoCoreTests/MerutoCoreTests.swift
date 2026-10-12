@@ -204,6 +204,21 @@ import Testing
         #expect(codex.dataTimestamp != nil)
     }
 
+    @Test func primaryWindowPrefersDailyOverWeekly() {
+        let daily = AgentQuotaWindow(
+            id: "daily", label: "Daily", kind: "daily", usedPct: 100, remainingPct: 0,
+            windowMinutes: 1440, resetsAt: nil, resetsInSeconds: 3600)
+        let weekly = AgentQuotaWindow(
+            id: "weekly", label: "Weekly", kind: "weekly", usedPct: 51, remainingPct: 49,
+            windowMinutes: 10080, resetsAt: nil, resetsInSeconds: 86400)
+        let devin = AgentQuotaProviderItem(
+            provider: "devin", scopeId: "default", scopeLabel: "Devin", status: "rate_limited",
+            planName: "Pro", emailMasked: nil, windows: [daily, weekly], credits: nil, currency: nil,
+            isStale: false, dataTimestamp: nil, lastErrorMessage: nil)
+        #expect(devin.primaryWindow?.id == "daily")
+        #expect(devin.weeklyWindow?.id == "weekly")
+    }
+
     @Test func displayOrderKeepsSixFixedSlots() throws {
         let items = try AgentQuotaPayload.decode(Data(Self.fixture.utf8))
         let ordered = AgentQuotaProviderItem.displayOrder(items)

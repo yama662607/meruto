@@ -66,7 +66,7 @@ public struct AgentQuotaProviderItem: Identifiable, Sendable, Equatable {
     }
 
     public var primaryWindow: AgentQuotaWindow? {
-        windows.first(where: { $0.kind == "rolling_short" }) ?? windows.first(where: { $0.kind == "weekly" }) ?? windows.first
+        windows.first(where: { $0.kind == "rolling_short" || $0.kind == "daily" }) ?? windows.first(where: { $0.kind == "weekly" }) ?? windows.first
     }
 
     public var weeklyWindow: AgentQuotaWindow? {
