@@ -66,7 +66,7 @@ public struct AgentQuotaProviderItem: Identifiable, Sendable, Equatable {
     }
 
     public var primaryWindow: AgentQuotaWindow? {
-        windows.first(where: { $0.kind == "rolling_short" }) ?? windows.first(where: { $0.kind == "weekly" }) ?? windows.first
+        windows.first(where: { $0.kind == "rolling_short" || $0.kind == "daily" }) ?? windows.first(where: { $0.kind == "weekly" }) ?? windows.first
     }
 
     public var weeklyWindow: AgentQuotaWindow? {
@@ -98,13 +98,14 @@ public struct AgentQuotaProviderItem: Identifiable, Sendable, Equatable {
             isStale: false, dataTimestamp: nil, lastErrorMessage: nil)
     }
 
-    /// 固定の 6 プロバイダー (データが無ければプレースホルダ) + それ以外、の順に並べる。
+    /// 固定のホームプロバイダー (データが無ければプレースホルダ) + それ以外、の順に並べる。
+    /// 同一プロバイダーに複数スコープがあれば (Claude の Personal / Team など) スコープごとに 1 スロットずつ。
     public static func displayOrder(_ providers: [AgentQuotaProviderItem]) -> [AgentQuotaProviderItem] {
-        let fixed = homeProviderIDs.map { provider in
-            providers
+        let fixed = homeProviderIDs.flatMap { provider -> [AgentQuotaProviderItem] in
+            let scopes = providers
                 .filter { $0.provider == provider }
                 .sorted { $0.scopeLabel < $1.scopeLabel }
-                .first ?? .homePlaceholder(provider: provider)
+            return scopes.isEmpty ? [.homePlaceholder(provider: provider)] : scopes
         }
         let extras = providers
             .filter { !homeProviderIDs.contains($0.provider) }

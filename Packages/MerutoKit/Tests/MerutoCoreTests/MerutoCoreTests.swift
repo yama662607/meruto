@@ -204,12 +204,49 @@ import Testing
         #expect(codex.dataTimestamp != nil)
     }
 
+    @Test func primaryWindowPrefersDailyOverWeekly() {
+        let daily = AgentQuotaWindow(
+            id: "daily", label: "Daily", kind: "daily", usedPct: 100, remainingPct: 0,
+            windowMinutes: 1440, resetsAt: nil, resetsInSeconds: 3600)
+        let weekly = AgentQuotaWindow(
+            id: "weekly", label: "Weekly", kind: "weekly", usedPct: 51, remainingPct: 49,
+            windowMinutes: 10080, resetsAt: nil, resetsInSeconds: 86400)
+        let devin = AgentQuotaProviderItem(
+            provider: "devin", scopeId: "default", scopeLabel: "Devin", status: "rate_limited",
+            planName: "Pro", emailMasked: nil, windows: [daily, weekly], credits: nil, currency: nil,
+            isStale: false, dataTimestamp: nil, lastErrorMessage: nil)
+        #expect(devin.primaryWindow?.id == "daily")
+        #expect(devin.weeklyWindow?.id == "weekly")
+    }
+
     @Test func displayOrderKeepsSixFixedSlots() throws {
         let items = try AgentQuotaPayload.decode(Data(Self.fixture.utf8))
         let ordered = AgentQuotaProviderItem.displayOrder(items)
         #expect(ordered.prefix(6).map(\.provider) == AgentQuotaProviderItem.homeProviderIDs)
         #expect(ordered[0].provider == "codex" && ordered[0].hasData)
         #expect(ordered[2].scopeId == "home-placeholder")
+    }
+
+    @Test func displayOrderKeepsOneSlotPerScope() {
+        func item(provider: String, scope: String, label: String) -> AgentQuotaProviderItem {
+            AgentQuotaProviderItem(
+                provider: provider, scopeId: scope, scopeLabel: label, status: "ready", planName: nil,
+                emailMasked: nil, windows: [], credits: nil, currency: nil, isStale: false,
+                dataTimestamp: nil, lastErrorMessage: nil)
+        }
+        let ordered = AgentQuotaProviderItem.displayOrder([
+            item(provider: "claude_code", scope: "personal", label: "Claude Personal"),
+            item(provider: "grok", scope: "g", label: "Grok"),
+            item(provider: "claude_code", scope: "default", label: "Claude Team"),
+            item(provider: "codex", scope: "x", label: "ChatGPT"),
+        ])
+        // Claude は Personal / Team が別スロット (ホームは 7 枠)、grok はホーム外の後ろへ。
+        #expect(ordered.prefix(7).map { $0.provider + ":" + $0.scopeId } == [
+            "codex:x", "claude_code:personal", "claude_code:default",
+            "antigravity:home-placeholder", "zai:home-placeholder", "deepseek:home-placeholder", "devin:home-placeholder",
+        ])
+        #expect(ordered.count == 8)
+        #expect(ordered.last?.provider == "grok")
     }
 
     @Test func shortWindowLevels() {

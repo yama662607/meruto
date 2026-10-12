@@ -25,7 +25,8 @@ struct AgentQuotaHomeCard: View {
     private func content(now: Date) -> some View {
         let displayed = store.displayedProviders
         VStack(alignment: .leading, spacing: 4) {
-            // Keep the six core providers visible even while the daemon is
+            // Keep the core providers (one slot per plan, e.g. Claude Personal / Team)
+            // visible even while the daemon is
             // unavailable or a provider has not returned data yet.
             AgentQuotaGaugeRow(providers: displayed, now: now)
 
@@ -33,7 +34,7 @@ struct AgentQuotaHomeCard: View {
             if !store.providers.isEmpty && isExpanded {
                 Divider().overlay(Color.white.opacity(0.06))
 
-                let others = Array(displayed.dropFirst(AgentQuotaProviderItem.homeProviderIDs.count))
+                let others = displayed.filter { !AgentQuotaProviderItem.homeProviderIDs.contains($0.provider) }
                 if !others.isEmpty {
                     HStack(spacing: 0) {
                         ForEach(others) { item in
