@@ -124,45 +124,41 @@ struct ProviderDetailPanel: View {
     }
 }
 
-/// ゲージまたは一覧行タップで開くプロバイダー詳細ハーフシート。
-/// 複数アカウント（Personal / Team 等）とすべてのウィンドウ（Argon / 3p / MCP 等）を表示する。
+/// ゲージまたは一覧行タップで開くアカウント詳細ハーフシート。
+/// 選択したアカウントの全ウィンドウ（Argon / 3p / MCP 等）を表示する。
 struct ProviderDetailSheet: View {
-    let providerID: String
+    let itemID: String
+    let fallbackItem: AgentQuotaProviderItem
     let store: AgentQuotaStore
     @Environment(\.dismiss) private var dismiss
     @State private var isRefreshingProvider = false
 
-    private var group: AgentQuotaProviderGroup {
-        store.allGroups.first { $0.provider == providerID }
-            ?? AgentQuotaProviderGroup(provider: providerID, scopes: [.homePlaceholder(provider: providerID)])
+    private var item: AgentQuotaProviderItem {
+        store.allItems.first { $0.id == itemID } ?? fallbackItem
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    VStack(spacing: 12) {
-                        ForEach(group.scopes) { scope in
-                            ProviderDetailPanel(
-                                item: scope,
-                                now: context.date,
-                                showTitleHeader: group.scopes.count <= 1
-                            )
-                        }
-                    }
+                    ProviderDetailPanel(
+                        item: item,
+                        now: context.date,
+                        showTitleHeader: true
+                    )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
             }
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle(group.representative.providerDisplayName)
+            .navigationTitle(item.scopeLabel.isEmpty ? item.providerDisplayName : item.scopeLabel)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         Task {
                             isRefreshingProvider = true
-                            await store.refreshProvider(providerID)
+                            await store.refreshProvider(item.provider)
                             isRefreshingProvider = false
                         }
                     } label: {

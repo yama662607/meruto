@@ -29,6 +29,30 @@ final class AgentQuotaStore {
         AgentQuotaProviderItem.displayOrder(providers)
     }
 
+    var homeItems: [AgentQuotaProviderItem] {
+        AgentQuotaProviderItem.homeProviderIDs.flatMap { provider -> [AgentQuotaProviderItem] in
+            let scopes = providers
+                .filter { $0.provider == provider }
+                .sorted { $0.scopeLabel < $1.scopeLabel }
+            return scopes.isEmpty ? [.homePlaceholder(provider: provider)] : scopes
+        }
+    }
+
+    var extraItems: [AgentQuotaProviderItem] {
+        providers
+            .filter { !AgentQuotaProviderItem.homeProviderIDs.contains($0.provider) }
+            .sorted { a, b in
+                let idxA = ["grok", "moonshot"].firstIndex(of: a.provider) ?? 99
+                let idxB = ["grok", "moonshot"].firstIndex(of: b.provider) ?? 99
+                if idxA == idxB { return a.scopeLabel < b.scopeLabel }
+                return idxA < idxB
+            }
+    }
+
+    var allItems: [AgentQuotaProviderItem] {
+        homeItems + extraItems
+    }
+
     var homeGroups: [AgentQuotaProviderGroup] {
         AgentQuotaProviderGroup.homeGroups(from: providers)
     }
