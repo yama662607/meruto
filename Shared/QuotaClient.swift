@@ -52,6 +52,27 @@ enum QuotaClient {
         return cached()
     }
 
+    /// 特定プロバイダーのみ即時再取得してから全体スナップショットを取り直す。
+    static func refreshProvider(
+        _ provider: String,
+        baseURL: String = SharedContainer.quotaBaseURL,
+        timeout: TimeInterval = 15
+    ) async throws -> Result {
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !trimmed.isEmpty, let url = URL(string: trimmed + "/api/v1/quota/\(provider)/refresh"), url.scheme != nil {
+            var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
+            request.httpMethod = "POST"
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.timeoutIntervalForRequest = timeout
+            configuration.timeoutIntervalForResource = timeout
+            let session = URLSession(configuration: configuration)
+            defer { session.finishTasksAndInvalidate() }
+            _ = try? await session.data(for: request)
+        }
+        return try await fetch(baseURL: baseURL, timeout: timeout)
+    }
+
     /// ウィジェット選択画面や初回用のサンプル。
     static let sample: [AgentQuotaProviderItem] = {
         let now = Date()
