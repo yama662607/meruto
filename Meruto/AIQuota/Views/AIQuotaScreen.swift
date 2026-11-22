@@ -1,11 +1,11 @@
 import MerutoCore
 import SwiftUI
 
-/// AI 使用量の画面。上にコンパクトなゲージカード、下にタップで詳細シートが開くプロバイダー一覧。
+/// AI 使用量の画面。上にコンパクトなゲージカード、下にタップで詳細シートが開くアカウント一覧。
 struct AIQuotaScreen: View {
     let store: AgentQuotaStore
     var onOpenSettings: () -> Void
-    @State private var selectedGroup: AgentQuotaProviderGroup?
+    @State private var selectedItem: AgentQuotaProviderItem?
 
     var body: some View {
         ScrollView {
@@ -24,12 +24,12 @@ struct AIQuotaScreen: View {
                             .foregroundStyle(Theme.label)
                     } content: {
                         VStack(spacing: 0) {
-                            let groups = store.allGroups.filter { $0.representative.hasData }
-                            ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                            let items = store.allItems.filter(\.hasData)
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                 if index > 0 {
                                     Divider().overlay(Color.white.opacity(0.06))
                                 }
-                                providerSummaryRow(group, now: context.date)
+                                itemSummaryRow(item, now: context.date)
                             }
                         }
                     }
@@ -43,48 +43,47 @@ struct AIQuotaScreen: View {
         .refreshable { await store.refresh() }
         .onAppear { store.setVisible(true) }
         .onDisappear { store.setVisible(false) }
-        .sheet(item: $selectedGroup) { group in
-            ProviderDetailSheet(providerID: group.provider, store: store)
+        .sheet(item: $selectedItem) { item in
+            ProviderDetailSheet(itemID: item.id, fallbackItem: item, store: store)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
     }
 
-    private func providerSummaryRow(_ group: AgentQuotaProviderGroup, now: Date) -> some View {
-        let rep = group.representative
-        return Button {
-            selectedGroup = group
+    private func itemSummaryRow(_ item: AgentQuotaProviderItem, now: Date) -> some View {
+        Button {
+            selectedItem = item
         } label: {
             HStack(spacing: 10) {
-                AgentBrandIconView(provider: group.provider, size: 22)
+                AgentBrandIconView(provider: item.provider, size: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text(rep.providerDisplayName)
+                        Text(item.scopeLabel.isEmpty ? item.providerDisplayName : item.scopeLabel)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
-                        if group.scopeCount > 1 {
-                            Text("\(group.scopeCount)")
-                                .font(Theme.mono(9, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(1)
+                        if let plan = item.planName?.uppercased() {
+                            Text(plan)
+                                .font(Theme.mono(8.5, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.75))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background(Color.white.opacity(0.10), in: Capsule())
                         }
-                        if group.hasHiddenConstraint {
+                        if item.hasConstrainedSubWindow {
                             Circle()
                                 .fill(Color.orange)
                                 .frame(width: 6, height: 6)
                         }
                     }
-                    let extraCount = group.scopes.reduce(0) { $0 + $1.windows.count }
-                    if extraCount > 0 {
-                        Text("\(extraCount) 枠 · タップで詳細")
+                    if !item.windows.isEmpty {
+                        Text("\(item.windows.count) 枠 · タップで詳細")
                             .font(Theme.mono(9.5))
                             .foregroundStyle(Theme.faint)
                     }
                 }
                 Spacer()
-                if let win = rep.primaryWindow {
+                if let win = item.primaryWindow {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(AgentQuotaDisplay.percentLabel(for: win.remainingPct, detailed: true))
                             .font(.system(size: 12, weight: .bold).monospacedDigit())
@@ -95,8 +94,8 @@ struct AIQuotaScreen: View {
                                 .foregroundStyle(Theme.label)
                         }
                     }
-                } else if let creds = rep.credits {
-                    Text("\(rep.currency ?? "$") \(String(format: "%.2f", creds))")
+                } else if let creds = item.credits {
+                    Text("\(item.currency ?? "$") \(String(format: "%.2f", creds))")
                         .font(.system(size: 12, weight: .bold).monospacedDigit())
                         .foregroundStyle(.cyan)
                 }

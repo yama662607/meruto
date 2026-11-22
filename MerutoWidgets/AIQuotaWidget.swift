@@ -13,8 +13,23 @@ struct AIQuotaEntry: TimelineEntry {
     let isPlaceholder: Bool
 
     var displayed: [AgentQuotaProviderItem] { AgentQuotaProviderItem.displayOrder(providers) }
-    var homeGroups: [AgentQuotaProviderGroup] { AgentQuotaProviderGroup.homeGroups(from: providers) }
-    var extraGroups: [AgentQuotaProviderGroup] { AgentQuotaProviderGroup.extraGroups(from: providers) }
+    var homeItems: [AgentQuotaProviderItem] {
+        AgentQuotaProviderItem.homeProviderIDs.flatMap { provider -> [AgentQuotaProviderItem] in
+            let scopes = providers
+                .filter { $0.provider == provider }
+                .sorted { $0.scopeLabel < $1.scopeLabel }
+            return scopes.isEmpty ? [.homePlaceholder(provider: provider)] : scopes
+        }
+    }
+    var extraItems: [AgentQuotaProviderItem] {
+        providers
+            .filter { !AgentQuotaProviderItem.homeProviderIDs.contains($0.provider) }
+            .sorted { a, b in
+                let idxA = ["grok", "moonshot"].firstIndex(of: a.provider) ?? 99
+                let idxB = ["grok", "moonshot"].firstIndex(of: b.provider) ?? 99
+                return idxA == idxB ? a.scopeLabel < b.scopeLabel : idxA < idxB
+            }
+    }
 
     /// 5h 枠 (無ければ週次枠) の残りが最も少ないプロバイダー。
     var mostConstrained: AgentQuotaProviderItem? {
@@ -101,18 +116,18 @@ struct AIQuotaWidgetView: View {
         }
     }
 
-    // SuperNotch と同じ 6 連ゲージ (複数アカウントはバッジ表示)。
+    // SuperNotch と同じゲージ列 (Personal / Team は別ゲージ表示)。
     private var medium: some View {
         VStack(spacing: 6) {
             header
             Spacer(minLength: 0)
             HStack(spacing: 3) {
-                ForEach(entry.homeGroups) { group in
+                ForEach(entry.homeItems) { item in
                     AgentQuotaMiniGauge(
-                        item: group.representative,
+                        item: item,
                         now: entry.date,
-                        scopeCount: group.scopeCount,
-                        hasHiddenConstraint: group.hasHiddenConstraint
+                        scale: entry.homeItems.count > 6 ? 0.88 : 1,
+                        hasHiddenConstraint: item.hasConstrainedSubWindow
                     )
                     .frame(maxWidth: .infinity)
                 }
@@ -126,29 +141,27 @@ struct AIQuotaWidgetView: View {
         VStack(spacing: 4) {
             header
             Spacer(minLength: 0)
-            let groups = Array(entry.homeGroups.prefix(6))
+            let items = Array(entry.homeItems.prefix(6))
             Grid(horizontalSpacing: 4, verticalSpacing: 6) {
                 GridRow {
-                    ForEach(groups.prefix(3)) { group in
+                    ForEach(items.prefix(3)) { item in
                         AgentQuotaMiniGauge(
-                            item: group.representative,
+                            item: item,
                             now: entry.date,
                             scale: 0.74,
                             showsWeekly: false,
-                            scopeCount: group.scopeCount,
-                            hasHiddenConstraint: group.hasHiddenConstraint
+                            hasHiddenConstraint: item.hasConstrainedSubWindow
                         )
                     }
                 }
                 GridRow {
-                    ForEach(groups.dropFirst(3)) { group in
+                    ForEach(items.dropFirst(3)) { item in
                         AgentQuotaMiniGauge(
-                            item: group.representative,
+                            item: item,
                             now: entry.date,
                             scale: 0.74,
                             showsWeekly: false,
-                            scopeCount: group.scopeCount,
-                            hasHiddenConstraint: group.hasHiddenConstraint
+                            hasHiddenConstraint: item.hasConstrainedSubWindow
                         )
                     }
                 }
@@ -161,26 +174,25 @@ struct AIQuotaWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             HStack(spacing: 3) {
-                ForEach(entry.homeGroups) { group in
+                ForEach(entry.homeItems) { item in
                     AgentQuotaMiniGauge(
-                        item: group.representative,
+                        item: item,
                         now: entry.date,
-                        scopeCount: group.scopeCount,
-                        hasHiddenConstraint: group.hasHiddenConstraint
+                        scale: entry.homeItems.count > 6 ? 0.88 : 1,
+                        hasHiddenConstraint: item.hasConstrainedSubWindow
                     )
                     .frame(maxWidth: .infinity)
                 }
             }
             .padding(.vertical, 2)
-            if !entry.extraGroups.isEmpty {
+            if !entry.extraItems.isEmpty {
                 HStack(spacing: 0) {
-                    ForEach(entry.extraGroups.prefix(6)) { group in
+                    ForEach(entry.extraItems.prefix(6)) { item in
                         AgentQuotaMiniGauge(
-                            item: group.representative,
+                            item: item,
                             now: entry.date,
                             scale: 0.85,
-                            scopeCount: group.scopeCount,
-                            hasHiddenConstraint: group.hasHiddenConstraint
+                            hasHiddenConstraint: item.hasConstrainedSubWindow
                         )
                         .frame(maxWidth: .infinity)
                     }
