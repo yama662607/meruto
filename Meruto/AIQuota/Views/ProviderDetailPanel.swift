@@ -4,9 +4,14 @@ import SwiftUI
 struct ProviderDetailPanel: View {
     let item: AgentQuotaProviderItem
     let now: Date
+    var showTitleHeader: Bool = true
 
     var body: some View {
-        Panel(title: item.providerDisplayName, icon: "circle.hexagongrid.fill", tint: statusColor) {
+        Panel(
+            title: showTitleHeader ? item.providerDisplayName : (item.scopeLabel.isEmpty ? item.scopeId : item.scopeLabel),
+            icon: "circle.hexagongrid.fill",
+            tint: statusColor
+        ) {
             Text(statusText)
                 .font(Theme.mono(9, weight: .bold))
                 .foregroundStyle(statusColor)
@@ -14,7 +19,7 @@ struct ProviderDetailPanel: View {
             HStack(spacing: 10) {
                 AgentBrandIconView(provider: item.provider, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.scopeLabel)
+                    Text(item.scopeLabel.isEmpty ? item.scopeId : item.scopeLabel)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                     if let detail = [item.planName?.uppercased(), item.emailMasked].compactMap({ $0 }).joined(separator: " · ")
@@ -30,20 +35,33 @@ struct ProviderDetailPanel: View {
                     Readout(label: item.currency ?? "Credits", value: String(format: "%.2f", credits), color: .cyan, size: 16)
                 }
             }
+
+            if item.windows.isEmpty && item.credits == nil {
+                Text("クォータ情報なし")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.faint)
+            }
+
             ForEach(item.windows) { window in
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(window.label)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.85))
                             .lineLimit(1)
-                        Spacer()
-                        Text("残り \(Int(window.remainingPct))%")
+                        Spacer(minLength: 4)
+                        if let units = window.unitsSummary {
+                            Text(units)
+                                .font(Theme.mono(9.5, weight: .medium))
+                                .foregroundStyle(Theme.label)
+                        }
+                        Text("残り \(AgentQuotaDisplay.percentLabel(for: window.remainingPct, detailed: true))")
                             .font(.system(size: 11, weight: .bold).monospacedDigit())
                             .foregroundStyle(AgentQuotaStyle.gaugeColor(for: window))
                         if let reset = AgentQuotaDisplay.resetLabel(for: window, now: now) {
-                            Text("↻ \(reset)")
-                                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            let abs = AgentQuotaDisplay.absoluteResetLabel(for: window, now: now)
+                            Text(abs.map { "↻ \(reset) (\($0))" } ?? "↻ \(reset)")
+                                .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
                                 .foregroundStyle(AgentQuotaStyle.resetColor(for: window, now: now).opacity(0.7))
                         }
                     }
@@ -58,6 +76,16 @@ struct ProviderDetailPanel: View {
                         }
                     }
                     .frame(height: 5)
+
+                    if let models = window.modelIds, !models.isEmpty {
+                        let joined = models.joined(separator: ", ")
+                        if joined.caseInsensitiveCompare(window.label) != .orderedSame {
+                            Text(joined)
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(Theme.faint)
+                                .lineLimit(2)
+                        }
+                    }
                 }
             }
             if let message = item.lastErrorMessage {
@@ -92,6 +120,64 @@ struct ProviderDetailPanel: View {
         case "degraded": "一部利用不可"
         case "unauthorized": "要再認証"
         default: item.status
+        }
+    }
+}
+
+/// ゲージまたは一覧行タップで開くプロバイダー詳細ハーフシート。
+/// 複数アカウント（Personal / Team 等）とすべてのウィンドウ（Argon / 3p / MCP 等）を表示する。
+struct ProviderDetailSheet: View {
+    let providerID: String
+    let store: AgentQuotaStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var isRefreshingProvider = false
+
+    private var group: AgentQuotaProviderGroup {
+        store.allGroups.first { $0.provider == providerID }
+            ?? AgentQuotaProviderGroup(provider: providerID, scopes: [.homePlaceholder(provider: providerID)])
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    VStack(spacing: 12) {
+                        ForEach(group.scopes) { scope in
+                            ProviderDetailPanel(
+                                item: scope,
+                                now: context.date,
+                                showTitleHeader: group.scopes.count <= 1
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+            }
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle(group.representative.providerDisplayName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            isRefreshingProvider = true
+                            await store.refreshProvider(providerID)
+                            isRefreshingProvider = false
+                        }
+                    } label: {
+                        if isRefreshingProvider {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isRefreshingProvider)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
         }
     }
 }

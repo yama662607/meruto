@@ -7,24 +7,49 @@ public struct AgentQuotaWindow: Identifiable, Sendable, Equatable {
     public let id: String
     public let label: String
     public let kind: String
+    public let modelIds: [String]?
     public let usedPct: Double
     public let remainingPct: Double
+    public let usedUnits: Double?
+    public let totalUnits: Double?
+    public let unit: String?
     public let windowMinutes: Int?
     public let resetsAt: Date?
     public let resetsInSeconds: Int?
 
     public init(
-        id: String, label: String, kind: String, usedPct: Double, remainingPct: Double,
+        id: String, label: String, kind: String, modelIds: [String]? = nil,
+        usedPct: Double, remainingPct: Double,
+        usedUnits: Double? = nil, totalUnits: Double? = nil, unit: String? = nil,
         windowMinutes: Int?, resetsAt: Date?, resetsInSeconds: Int?
     ) {
         self.id = id
         self.label = label
         self.kind = kind
+        self.modelIds = modelIds
         self.usedPct = usedPct
         self.remainingPct = remainingPct
+        self.usedUnits = usedUnits
+        self.totalUnits = totalUnits
+        self.unit = unit
         self.windowMinutes = windowMinutes
         self.resetsAt = resetsAt
         self.resetsInSeconds = resetsInSeconds
+    }
+
+    public var unitsSummary: String? {
+        guard let used = usedUnits, let total = totalUnits, total > 0, unit != "percent" else {
+            return nil
+        }
+        let unitSuffix: String
+        switch unit {
+        case "requests": unitSuffix = "req"
+        case let value? where !value.isEmpty: unitSuffix = value
+        default: unitSuffix = ""
+        }
+        let usedText = used.rounded() == used ? "\(Int(used))" : String(format: "%.1f", used)
+        let totalText = total.rounded() == total ? "\(Int(total))" : String(format: "%.1f", total)
+        return unitSuffix.isEmpty ? "\(usedText)/\(totalText)" : "\(usedText)/\(totalText) \(unitSuffix)"
     }
 }
 
@@ -66,11 +91,29 @@ public struct AgentQuotaProviderItem: Identifiable, Sendable, Equatable {
     }
 
     public var primaryWindow: AgentQuotaWindow? {
-        windows.first(where: { $0.kind == "rolling_short" }) ?? windows.first(where: { $0.kind == "weekly" }) ?? windows.first
+        windows.first(where: { $0.kind == "rolling_short" || $0.kind == "daily" })
+            ?? windows.first(where: { $0.kind == "weekly" })
+            ?? windows.first
     }
 
     public var weeklyWindow: AgentQuotaWindow? {
         windows.first(where: { $0.kind == "weekly" })
+    }
+
+    /// リングの週次単枠と重複しない場合のみ返すミニバー用の週次枠。
+    public var secondaryWeeklyWindow: AgentQuotaWindow? {
+        guard let weekly = weeklyWindow, weekly.id != primaryWindow?.id else { return nil }
+        return weekly
+    }
+
+    /// ホームの省スペース表示では隠す追加枠 (`model_specific`, MCP など)。
+    public var extraWindows: [AgentQuotaWindow] {
+        let shownIDs = Set([primaryWindow?.id, weeklyWindow?.id].compactMap { $0 })
+        return windows.filter { !shownIDs.contains($0.id) }
+    }
+
+    public var hasConstrainedSubWindow: Bool {
+        extraWindows.contains { $0.remainingPct < 20.0 }
     }
 
     public var hasData: Bool {
@@ -115,6 +158,75 @@ public struct AgentQuotaProviderItem: Identifiable, Sendable, Equatable {
                 return idxA < idxB
             }
         return fixed + extras
+    }
+}
+
+/// 同一プロバイダーの複数アカウントを 1 ゲージに集約しつつ、詳細シートで全スコープを見せるためのグループ。
+public struct AgentQuotaProviderGroup: Identifiable, Sendable, Equatable {
+    public var id: String { provider }
+    public let provider: String
+    public let scopes: [AgentQuotaProviderItem]
+
+    public init(provider: String, scopes: [AgentQuotaProviderItem]) {
+        self.provider = provider
+        self.scopes = scopes
+    }
+
+    public var representative: AgentQuotaProviderItem {
+        let usable = scopes.filter { $0.hasData && $0.status != "unauthorized" && $0.status != "unavailable" }
+        let pool = usable.isEmpty ? scopes : usable
+        if let bestWindowed = pool
+            .filter({ $0.primaryWindow != nil })
+            .max(by: { ($0.primaryWindow?.remainingPct ?? -1) < ($1.primaryWindow?.remainingPct ?? -1) })
+        {
+            return bestWindowed
+        }
+        return pool.first(where: { $0.hasData }) ?? scopes.first ?? .homePlaceholder(provider: provider)
+    }
+
+    public var scopeCount: Int {
+        scopes.filter { $0.scopeId != "home-placeholder" }.count
+    }
+
+    public var hasHiddenConstraint: Bool {
+        let repID = representative.id
+        if representative.hasConstrainedSubWindow { return true }
+        return scopes.contains { scope in
+            guard scope.id != repID else { return false }
+            if scope.status == "unauthorized" || scope.status == "rate_limited" { return true }
+            if let pct = scope.primaryWindow?.remainingPct, pct < 20.0 { return true }
+            return scope.hasConstrainedSubWindow
+        }
+    }
+
+    public static func homeGroups(from providers: [AgentQuotaProviderItem]) -> [AgentQuotaProviderGroup] {
+        AgentQuotaProviderItem.homeProviderIDs.map { provider in
+            let scopes = providers
+                .filter { $0.provider == provider }
+                .sorted { $0.scopeLabel < $1.scopeLabel }
+            return AgentQuotaProviderGroup(
+                provider: provider,
+                scopes: scopes.isEmpty ? [.homePlaceholder(provider: provider)] : scopes)
+        }
+    }
+
+    public static func extraGroups(from providers: [AgentQuotaProviderItem]) -> [AgentQuotaProviderGroup] {
+        let extraIDs = Array(Set(providers.map(\.provider).filter { !AgentQuotaProviderItem.homeProviderIDs.contains($0) }))
+            .sorted { a, b in
+                let idxA = AgentQuotaProviderItem.additionalProviderOrder.firstIndex(of: a) ?? 99
+                let idxB = AgentQuotaProviderItem.additionalProviderOrder.firstIndex(of: b) ?? 99
+                return idxA == idxB ? a < b : idxA < idxB
+            }
+        return extraIDs.map { provider in
+            let scopes = providers
+                .filter { $0.provider == provider }
+                .sorted { $0.scopeLabel < $1.scopeLabel }
+            return AgentQuotaProviderGroup(provider: provider, scopes: scopes)
+        }
+    }
+
+    public static func allGroups(from providers: [AgentQuotaProviderItem]) -> [AgentQuotaProviderGroup] {
+        homeGroups(from: providers) + extraGroups(from: providers)
     }
 }
 
@@ -169,8 +281,12 @@ public enum AgentQuotaPayload {
             let id: String
             let label: String
             let kind: String
+            let model_ids: [String]?
             let used_pct: Double?
             let remaining_pct: Double?
+            let used_units: Double?
+            let total_units: Double?
+            let unit: String?
             let window_minutes: Int?
             let resets_at: String?
             let resets_in_seconds: Int?
@@ -209,8 +325,12 @@ public enum AgentQuotaPayload {
             let wins = (raw.windows ?? []).map { w in
                 AgentQuotaWindow(
                     id: w.id, label: w.label, kind: w.kind,
+                    modelIds: w.model_ids,
                     usedPct: w.used_pct ?? 0.0,
                     remainingPct: w.remaining_pct ?? 100.0,
+                    usedUnits: w.used_units,
+                    totalUnits: w.total_units,
+                    unit: w.unit,
                     windowMinutes: w.window_minutes,
                     resetsAt: parseTimestamp(w.resets_at),
                     resetsInSeconds: w.resets_in_seconds)
@@ -287,6 +407,26 @@ public enum AgentQuotaDisplay {
     public static func shouldShowStaleState(isStale: Bool, timestamp: Date?, now: Date) -> Bool {
         guard isStale, let timestamp else { return false }
         return now.timeIntervalSince(timestamp) >= staleDisplayThreshold
+    }
+
+    public static func percentLabel(for remainingPct: Double, detailed: Bool) -> String {
+        let clamped = min(100, max(0, remainingPct))
+        if detailed, abs(clamped - clamped.rounded()) >= 0.05 {
+            return String(format: "%.1f%%", clamped)
+        }
+        return "\(Int(clamped.rounded()))%"
+    }
+
+    public static func absoluteResetLabel(for window: AgentQuotaWindow?, now: Date) -> String? {
+        guard let resetsAt = window?.resetsAt else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        if Calendar.current.isDate(resetsAt, inSameDayAs: now) {
+            formatter.dateFormat = "HH:mm"
+        } else {
+            formatter.dateFormat = "M/d HH:mm"
+        }
+        return formatter.string(from: resetsAt)
     }
 
     public static func duration(seconds: Int) -> String {

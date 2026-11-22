@@ -264,4 +264,64 @@ import Testing
         #expect(AgentQuotaDisplay.shouldShowStaleState(isStale: true, timestamp: now.addingTimeInterval(-700), now: now))
         #expect(!AgentQuotaDisplay.shouldShowStaleState(isStale: false, timestamp: now.addingTimeInterval(-700), now: now))
     }
+
+    @Test func decodesModelIdsAndUnitsAndDailyPrimaryWindow() throws {
+        let json = """
+            {"providers":[
+              {"provider":"antigravity","scope_id":"cli","scope_label":"agy CLI","status":"ready",
+               "windows":[
+                 {"id":"gemini-weekly","label":"Gemini Models Weekly","kind":"weekly","model_ids":["Gemini 4 Neon","Gemini 4 Hydrogen"],"used_pct":49.86,"remaining_pct":50.14,"unit":"percent","window_minutes":10080},
+                 {"id":"gemini-argon-wtu-weekly","label":"Gemini 4 Argon Weekly Limit","kind":"model_specific","model_ids":["Gemini 4 Argon"],"used_pct":90.0,"remaining_pct":10.0,"unit":"percent","window_minutes":10080}]},
+              {"provider":"zai","scope_id":"key-1","scope_label":"Z.ai","status":"ready",
+               "windows":[
+                 {"id":"mcp","label":"MCP Quota","kind":"other","used_pct":59.0,"remaining_pct":41.0,"used_units":59,"total_units":100,"unit":"requests"}]},
+              {"provider":"devin","scope_id":"default","scope_label":"Devin","status":"ready",
+               "windows":[
+                 {"id":"daily","label":"Daily Quota","kind":"daily","used_pct":20.0,"remaining_pct":80.0,"window_minutes":1440},
+                 {"id":"weekly","label":"Weekly Quota","kind":"weekly","used_pct":10.0,"remaining_pct":90.0,"window_minutes":10080}]}
+            ]}
+            """
+        let items = try AgentQuotaPayload.decode(Data(json.utf8))
+        let agy = try #require(items.first { $0.provider == "antigravity" })
+        #expect(agy.windows.first?.modelIds == ["Gemini 4 Neon", "Gemini 4 Hydrogen"])
+        #expect(agy.extraWindows.map(\.id) == ["gemini-argon-wtu-weekly"])
+        #expect(agy.hasConstrainedSubWindow)
+        #expect(AgentQuotaDisplay.percentLabel(for: 50.14, detailed: true) == "50.1%")
+        #expect(AgentQuotaDisplay.percentLabel(for: 50.14, detailed: false) == "50%")
+
+        let zai = try #require(items.first { $0.provider == "zai" })
+        #expect(zai.windows.first?.unitsSummary == "59/100 req")
+
+        let devin = try #require(items.first { $0.provider == "devin" })
+        #expect(devin.primaryWindow?.id == "daily")
+        #expect(devin.secondaryWeeklyWindow?.id == "weekly")
+    }
+
+    @Test func providerGroupingRetainsAllScopesAndFlagsHiddenConstraints() {
+        let personal = AgentQuotaProviderItem(
+            provider: "codex", scopeId: "p", scopeLabel: "Codex Personal", status: "warning",
+            planName: "plus", emailMasked: nil,
+            windows: [
+                AgentQuotaWindow(
+                    id: "five_hour", label: "5-Hour Window", kind: "rolling_short",
+                    usedPct: 90, remainingPct: 10, windowMinutes: 300, resetsAt: nil, resetsInSeconds: 3600)
+            ],
+            credits: nil, currency: nil, isStale: false, dataTimestamp: nil, lastErrorMessage: nil)
+        let team = AgentQuotaProviderItem(
+            provider: "codex", scopeId: "t", scopeLabel: "Codex Team", status: "ready",
+            planName: "sci", emailMasked: nil,
+            windows: [
+                AgentQuotaWindow(
+                    id: "weekly", label: "Weekly Window", kind: "weekly",
+                    usedPct: 5, remainingPct: 95, windowMinutes: 10080, resetsAt: nil, resetsInSeconds: 500_000)
+            ],
+            credits: nil, currency: nil, isStale: false, dataTimestamp: nil, lastErrorMessage: nil)
+
+        let groups = AgentQuotaProviderGroup.homeGroups(from: [personal, team])
+        let codex = groups.first { $0.provider == "codex" }
+        #expect(codex?.scopeCount == 2)
+        #expect(codex?.representative.scopeId == "t")
+        #expect(codex?.representative.secondaryWeeklyWindow == nil)
+        #expect(codex?.hasHiddenConstraint == true)
+    }
 }

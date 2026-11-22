@@ -81,6 +81,8 @@ struct AgentQuotaMiniGauge: View {
     let now: Date
     var scale: CGFloat = 1
     var showsWeekly: Bool = true
+    var scopeCount: Int = 1
+    var hasHiddenConstraint: Bool = false
 
     var body: some View {
         let showsStaleState = AgentQuotaDisplay.shouldShowStaleState(
@@ -126,6 +128,24 @@ struct AgentQuotaMiniGauge: View {
 
                 // 中央: ロゴアイコン（大きく24px）
                 AgentBrandIconView(provider: item.provider, size: 24 * scale)
+
+                if scopeCount > 1 {
+                    Text("\(scopeCount)")
+                        .font(.system(size: 7.5 * scale, weight: .bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .frame(width: 13 * scale, height: 13 * scale)
+                        .background(Color.black.opacity(0.75), in: Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 0.75))
+                        .offset(x: 17 * scale, y: -17 * scale)
+                }
+
+                if hasHiddenConstraint {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5.5 * scale, height: 5.5 * scale)
+                        .overlay(Circle().stroke(Color.black.opacity(0.7), lineWidth: 0.75))
+                        .offset(x: 17 * scale, y: 17 * scale)
+                }
             }
             .frame(width: 46 * scale, height: 46 * scale)
 
@@ -149,8 +169,8 @@ struct AgentQuotaMiniGauge: View {
             }
 
             if showsWeekly {
-                // 3. ミニバー (1w週間枠: 線幅2.5px)
-                if let weekly = item.weeklyWindow {
+                // 3. ミニバー (1w週間枠: primaryWindow と重複しない場合のみ表示)
+                if let weekly = item.secondaryWeeklyWindow {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
@@ -178,13 +198,18 @@ struct AgentQuotaMiniGauge: View {
                         .padding(.top, 1)
                 } else {
                     Spacer().frame(height: 2.5 * scale)
+                        .padding(.top, 1)
                 }
 
                 // 4. バーのした: 1wリセットまでの時間
-                if let weekText = AgentQuotaDisplay.resetLabel(for: item.weeklyWindow, now: now) {
+                if let weekText = AgentQuotaDisplay.resetLabel(for: item.secondaryWeeklyWindow, now: now) {
                     Text(weekText)
                         .font(.system(size: 8.5 * scale, weight: .medium).monospacedDigit())
                         .foregroundStyle(Color.white.opacity(0.40))
+                } else if item.primaryWindow?.isWeekly == true {
+                    Text("7d")
+                        .font(.system(size: 8.5 * scale, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.35))
                 } else if item.credits != nil {
                     Text("残高")
                         .font(.system(size: 8.5 * scale, weight: .medium))

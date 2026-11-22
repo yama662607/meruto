@@ -13,6 +13,8 @@ struct AIQuotaEntry: TimelineEntry {
     let isPlaceholder: Bool
 
     var displayed: [AgentQuotaProviderItem] { AgentQuotaProviderItem.displayOrder(providers) }
+    var homeGroups: [AgentQuotaProviderGroup] { AgentQuotaProviderGroup.homeGroups(from: providers) }
+    var extraGroups: [AgentQuotaProviderGroup] { AgentQuotaProviderGroup.extraGroups(from: providers) }
 
     /// 5h 枠 (無ければ週次枠) の残りが最も少ないプロバイダー。
     var mostConstrained: AgentQuotaProviderItem? {
@@ -99,12 +101,23 @@ struct AIQuotaWidgetView: View {
         }
     }
 
-    // SuperNotch と同じ 6 連ゲージ。
+    // SuperNotch と同じ 6 連ゲージ (複数アカウントはバッジ表示)。
     private var medium: some View {
         VStack(spacing: 6) {
             header
             Spacer(minLength: 0)
-            AgentQuotaGaugeRow(providers: entry.displayed, now: entry.date)
+            HStack(spacing: 3) {
+                ForEach(entry.homeGroups) { group in
+                    AgentQuotaMiniGauge(
+                        item: group.representative,
+                        now: entry.date,
+                        scopeCount: group.scopeCount,
+                        hasHiddenConstraint: group.hasHiddenConstraint
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.vertical, 2)
             Spacer(minLength: 0)
         }
     }
@@ -113,13 +126,31 @@ struct AIQuotaWidgetView: View {
         VStack(spacing: 4) {
             header
             Spacer(minLength: 0)
-            let items = Array(entry.displayed.prefix(6))
+            let groups = Array(entry.homeGroups.prefix(6))
             Grid(horizontalSpacing: 4, verticalSpacing: 6) {
                 GridRow {
-                    ForEach(items.prefix(3)) { AgentQuotaMiniGauge(item: $0, now: entry.date, scale: 0.74, showsWeekly: false) }
+                    ForEach(groups.prefix(3)) { group in
+                        AgentQuotaMiniGauge(
+                            item: group.representative,
+                            now: entry.date,
+                            scale: 0.74,
+                            showsWeekly: false,
+                            scopeCount: group.scopeCount,
+                            hasHiddenConstraint: group.hasHiddenConstraint
+                        )
+                    }
                 }
                 GridRow {
-                    ForEach(items.dropFirst(3)) { AgentQuotaMiniGauge(item: $0, now: entry.date, scale: 0.74, showsWeekly: false) }
+                    ForEach(groups.dropFirst(3)) { group in
+                        AgentQuotaMiniGauge(
+                            item: group.representative,
+                            now: entry.date,
+                            scale: 0.74,
+                            showsWeekly: false,
+                            scopeCount: group.scopeCount,
+                            hasHiddenConstraint: group.hasHiddenConstraint
+                        )
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -129,18 +160,34 @@ struct AIQuotaWidgetView: View {
     private var large: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            AgentQuotaGaugeRow(providers: entry.displayed, now: entry.date)
-            let others = Array(entry.displayed.dropFirst(AgentQuotaProviderItem.homeProviderIDs.count))
-            if !others.isEmpty {
+            HStack(spacing: 3) {
+                ForEach(entry.homeGroups) { group in
+                    AgentQuotaMiniGauge(
+                        item: group.representative,
+                        now: entry.date,
+                        scopeCount: group.scopeCount,
+                        hasHiddenConstraint: group.hasHiddenConstraint
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.vertical, 2)
+            if !entry.extraGroups.isEmpty {
                 HStack(spacing: 0) {
-                    ForEach(others.prefix(6)) { item in
-                        AgentQuotaMiniGauge(item: item, now: entry.date, scale: 0.85)
-                            .frame(maxWidth: .infinity)
+                    ForEach(entry.extraGroups.prefix(6)) { group in
+                        AgentQuotaMiniGauge(
+                            item: group.representative,
+                            now: entry.date,
+                            scale: 0.85,
+                            scopeCount: group.scopeCount,
+                            hasHiddenConstraint: group.hasHiddenConstraint
+                        )
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
             Divider().overlay(Color.white.opacity(0.08))
-            AgentQuotaWeeklyBars(providers: entry.displayed)
+            AgentQuotaWeeklyBars(providers: entry.providers)
             Spacer(minLength: 0)
         }
     }

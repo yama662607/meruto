@@ -29,6 +29,35 @@ final class AgentQuotaStore {
         AgentQuotaProviderItem.displayOrder(providers)
     }
 
+    var homeGroups: [AgentQuotaProviderGroup] {
+        AgentQuotaProviderGroup.homeGroups(from: providers)
+    }
+
+    var extraGroups: [AgentQuotaProviderGroup] {
+        AgentQuotaProviderGroup.extraGroups(from: providers)
+    }
+
+    var allGroups: [AgentQuotaProviderGroup] {
+        AgentQuotaProviderGroup.allGroups(from: providers)
+    }
+
+    func refreshProvider(_ provider: String) async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        do {
+            let result = try await QuotaClient.refreshProvider(provider)
+            providers = result.providers
+            lastUpdated = result.fetchedAt
+            isDaemonRunning = true
+            isShowingCache = false
+            lastError = nil
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetKinds.aiQuota)
+        } catch {
+            lastError = Self.describe(error)
+        }
+    }
+
     /// 複数の画面から参照されるので、表示中の数を数えて 0 になったら止める。
     func setVisible(_ visible: Bool) {
         visibleCount = max(0, visibleCount + (visible ? 1 : -1))
